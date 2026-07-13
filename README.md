@@ -1,100 +1,100 @@
-# Cloudflare proxyIP DNS Updater
+# Cloudflare代理IP DNS更新器
 
-This project automatically updates Cloudflare DNS records with the fastest proxy IP addresses found. It's designed to be run as a scheduled GitHub Actions workflow on a Ubuntu free runner.
+本项目自动使用找到的最快代理IP地址更新Cloudflare DNS记录。它被设计为在Ubuntu免费运行器上作为计划任务运行的GitHub Actions工作流。
 
-## How it Works
+## 工作原理
 
-1. **Discovering Proxy IPs (`scripts/getIPs.py`):** Fetches Oracle Cloud public CIDR ranges, connects to every IP on port 443 with TLS SNI set to `speed.cloudflare.com`, and checks if the response comes from Cloudflare's edge. Scans all IPv4 and IPv6 ranges with no limits using asyncio parallelism. Results saved to `result/ips.csv`.
+1. **发现代理IP（`scripts/getIPs.py`）：** 获取Oracle Cloud公共CIDR范围，连接到每个IP的443端口，TLS SNI设置为`speed.cloudflare.com`，并检查响应是否来自Cloudflare的边缘节点。使用asyncio并行机制无限制地扫描所有IPv4和IPv6范围。结果保存到`result/ips.csv`。
 
-2. **IP Testing (`scripts/cfSpeedTest.py`):** Reads `result/ips.csv`, groups IPs by region, tests ping, download, and upload speed through real TLS socket connections to each proxy IP. Supports IPv4 and IPv6. Results saved to `result/tested-ips.csv`.
+2. **IP测试（`scripts/cfSpeedTest.py`）：** 读取`result/ips.csv`，按区域对IP进行分组，通过真实的TLS套接字连接测试每个代理IP的ping、下载和上传速度。支持IPv4和IPv6。结果保存到`result/tested-ips.csv`。
 
-3. **Domain IP Mapping (`scripts/mapDomain.py`):** Joins `result/ips.csv` (region lookup) and `result/tested-ips.csv` (speed data) on IP, maps the best-performing IPs to domains per region, sorted by download speed. Results saved to `result/domains-ips.csv`.
+3. **域名IP映射（`scripts/mapDomain.py`）：** 将`result/ips.csv`（区域查询）和`result/tested-ips.csv`（速度数据）按IP进行关联，将表现最佳的IP按区域映射到域名，按下载速度排序。结果保存到`result/domains-ips.csv`。
 
-4. **Cloudflare Record Update (`scripts/cfRecUpdate.py`):** Reads `result/domains-ips.csv`, updates Cloudflare DNS records with the IP addresses. Automatically detects IP version — creates A records for IPv4 and AAAA records for IPv6. Updates existing records in-place, creates new ones, and deletes extras.
+4. **Cloudflare记录更新（`scripts/cfRecUpdate.py`）：** 读取`result/domains-ips.csv`，使用IP地址更新Cloudflare DNS记录。自动检测IP版本——为IPv4创建A记录，为IPv6创建AAAA记录。原地更新现有记录，创建新记录，并删除多余的记录。
 
-5. **Workflow Automation:** A GitHub Actions workflow (`daily_update.yml`) schedules the entire process to run every twelve hours.
+5. **工作流自动化：** 一个GitHub Actions工作流（`daily_update.yml`）每十二小时调度运行整个过程。
 
-## GitHub Setup
+## GitHub设置
 
-1. **Repository:** Clone/Fork this repository to your GitHub account.
+1. **仓库：** 将此仓库克隆/复刻到您的GitHub账户。
 
-2. **Edit Configurations:** Edit the `config.ini` to your desired configs.
+2. **编辑配置：** 编辑`config.ini`为您的所需配置。
 
-3. **Workflow Configuration:**
-   - In your repository's settings (Settings > Secrets and variables > Actions > Secrets), add a secret named `CLOUDFLARE_API_TOKEN` with your Cloudflare API token.
+3. **工作流配置：**
+   - 在您仓库的设置中（Settings > Secrets and variables > Actions > Secrets），添加一个名为`CLOUDFLARE_API_TOKEN`的密钥，值为您的Cloudflare API令牌。
 
-4. **Workflow Dispatch (Optional):** You can manually trigger the workflow from the "Actions" tab of your repository if needed.
+4. **工作流手动触发（可选）：** 如果需要，您可以从仓库的"Actions"选项卡手动触发工作流。
 
-## Local Setup
+## 本地设置
 
-1. **Repository:** Clone this repository with git.
+1. **仓库：** 使用git克隆此仓库。
 
-2. **Edit Configurations:** Edit the `config.ini` to your desired configs.
+2. **编辑配置：** 编辑`config.ini`为您的所需配置。
 
-3. **Set Environment Variables:**
-   - Set environment variable named `CLOUDFLARE_API_TOKEN` with your Cloudflare API token.
+3. **设置环境变量：**
+   - 设置名为`CLOUDFLARE_API_TOKEN`的环境变量，值为您的Cloudflare API令牌。
 
-4. **Running:**
-   - To get the Proxy IPs, run `python "scripts/getIPs.py"`
-   - Test the Proxy IPs, run `python "scripts/cfSpeedTest.py"`
-   - Map the IPs to Domains, run `python "scripts/mapDomain.py"`
-   - Finally, Update Cloudflare records, run `python "scripts/cfRecUpdate.py"`
+4. **运行：**
+   - 获取代理IP，运行`python "scripts/getIPs.py"`
+   - 测试代理IP，运行`python "scripts/cfSpeedTest.py"`
+   - 将IP映射到域名，运行`python "scripts/mapDomain.py"`
+   - 最后，更新Cloudflare记录，运行`python "scripts/cfRecUpdate.py"`
 
-## Configuration Guide
+## 配置指南
 
-### 1. **Get IPs**
-- **Purpose:** Discover Cloudflare proxy IPs within Oracle Cloud infrastructure by scanning all public CIDR ranges.
-- **Settings:**
-  - `ranges_url`: Oracle Cloud public IP ranges JSON URL (default: `https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json`).
-  - `region_url`: Cloudflare colo-to-region mapping CSV URL (default: Netrvin/cloudflare-colo-list).
-  - `timeout`: Per-connection timeout for proxy scanning in seconds (default: `1`).
-  - `max_concurrent`: Maximum concurrent asyncio tasks (default: `2000`).
-  - `fetch_cidrs_timeout`: HTTP timeout for fetching Oracle CIDRs in seconds (default: `30`).
-  - `fetch_colo_timeout`: HTTP timeout for fetching colo CSV in seconds (default: `4`).
-  - `output_file`: Path to save the discovered proxy IPs (default: `result/ips.csv`).
+### 1. **获取IP**
+- **用途：** 通过扫描所有公共CIDR范围，在Oracle Cloud基础设施中发现Cloudflare代理IP。
+- **设置：**
+  - `ranges_url`：Oracle Cloud公共IP范围JSON URL（默认：`https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json`）。
+  - `region_url`：Cloudflare colo到区域映射CSV URL（默认：Netrvin/cloudflare-colo-list）。
+  - `timeout`：代理扫描的每次连接超时时间，单位秒（默认：`1`）。
+  - `max_concurrent`：最大并发asyncio任务数（默认：`2000`）。
+  - `fetch_cidrs_timeout`：获取Oracle CIDR的HTTP超时时间，单位秒（默认：`30`）。
+  - `fetch_colo_timeout`：获取colo CSV的HTTP超时时间，单位秒（默认：`4`）。
+  - `output_file`：保存发现的代理IP的路径（默认：`result/ips.csv`）。
 
-### 2. **Cloudflare Speed Test (cfSpeedTest)**
-- **Purpose:** Test the speed and quality of IPs for ping, download, and upload performance.
-- **Settings:**
-  - `file_ips`: Input CSV with discovered IPs and regions (default: `result/ips.csv`).
-  - `max_ips`: Maximum number of IPs to test per region (default: `24`).
-  - `max_ping`: Maximum acceptable ping in ms (default: `896`).
-  - `min_download_speed`: Minimum acceptable download speed in Mbps (default: `20.0`).
-  - `min_upload_speed`: Minimum acceptable upload speed in Mbps (default: `20.0`).
-  - `test_size`: Data size in KB for testing download/upload speeds (default: `10240`).
-  - `timeout`: Per-connection timeout for all speed test operations in seconds (default: `4`).
-  - `ping_workers`: Thread pool size for parallel ping tests (default: `20`).
-  - `output_file`: File to save the test results (default: `result/tested-ips.csv`).
+### 2. **Cloudflare速度测试（cfSpeedTest）**
+- **用途：** 测试IP的ping、下载和上传性能的速度和质量。
+- **设置：**
+  - `file_ips`：包含发现的IP和区域的输入CSV（默认：`result/ips.csv`）。
+  - `max_ips`：每个区域最多测试的IP数量（默认：`24`）。
+  - `max_ping`：最大可接受ping值，单位ms（默认：`896`）。
+  - `min_download_speed`：最小可接受下载速度，单位Mbps（默认：`20.0`）。
+  - `min_upload_speed`：最小可接受上传速度，单位Mbps（默认：`20.0`）。
+  - `test_size`：测试下载/上传速度的数据大小，单位KB（默认：`10240`）。
+  - `timeout`：所有速度测试操作的每次连接超时时间，单位秒（默认：`4`）。
+  - `ping_workers`：并行ping测试的线程池大小（默认：`20`）。
+  - `output_file`：保存测试结果的文件（默认：`result/tested-ips.csv`）。
 
-### 3. **Map Domain**
-- **Purpose:** Assign tested IPs to specific regions and domains.
-- **Settings:**
-  - `file_ips`: CSV with IP-to-region mapping (default: `result/ips.csv`).
-  - `file_tests`: CSV with tested IP performance data (default: `result/tested-ips.csv`).
-  - `output_file`: Output CSV with domain-to-IP mapping (default: `result/domains-ips.csv`).
-- **Mapping Rules (`[mapDomain.map]`):**
-  - Each line maps a region to a domain and max IPs.
-  - Format: `{REGION} = {DOMAIN},{MAX_IPS}` e.g.:
+### 3. **映射域名**
+- **用途：** 将已测试的IP分配给特定的区域和域名。
+- **设置：**
+  - `file_ips`：IP到区域映射的CSV（默认：`result/ips.csv`）。
+  - `file_tests`：已测试IP性能数据的CSV（默认：`result/tested-ips.csv`）。
+  - `output_file`：域名到IP映射的输出CSV（默认：`result/domains-ips.csv`）。
+- **映射规则（`[mapDomain.map]`）：**
+  - 每行将一个区域映射到一个域名和最大IP数量。
+  - 格式：`{区域} = {域名},{最大IP数量}` 例如：
     - `Europe = proxy.farel.is-a.dev,5`
     - `Asia_Pacific = proxy.farel.is-a.dev,10`
 
-### 4. **Cloudflare Record Update (cfRecUpdate)**
-- **Purpose:** Update Cloudflare DNS records based on the mapped domains and IPs. Automatically creates A records for IPv4 and AAAA records for IPv6.
-- **Settings:**
-  - `api_url`: Cloudflare API base URL (default: `https://api.cloudflare.com/client/v4`).
-  - `zone_id`: Cloudflare Zone ID for updates.
-  - `file_domains`: CSV with domains and their corresponding IPs (default: `result/domains-ips.csv`).
+### 4. **Cloudflare记录更新（cfRecUpdate）**
+- **用途：** 根据映射的域名和IP更新Cloudflare DNS记录。自动为IPv4创建A记录，为IPv6创建AAAA记录。
+- **设置：**
+  - `api_url`：Cloudflare API基础URL（默认：`https://api.cloudflare.com/client/v4`）。
+  - `zone_id`：用于更新的Cloudflare区域ID。
+  - `file_domains`：包含域名及其对应IP的CSV（默认：`result/domains-ips.csv`）。
 
-Each section aligns with a specific step in the process, allowing for modular usage and configuration. Every config key has a sensible default — only `zone_id` and the `CLOUDFLARE_API_TOKEN` environment variable are required.
+每个部分对应流程中的特定步骤，允许模块化使用和配置。每个配置键都有合理的默认值——只有`zone_id`和`CLOUDFLARE_API_TOKEN`环境变量是必需的。
 
-## License
+## 许可证
 
-This project is licensed under the GNU General Public License v3.0 — see the [LICENSE](LICENSE) file for details.
+本项目采用GNU通用公共许可证v3.0授权——详见[LICENSE](LICENSE)文件。
 
-## Disclaimer
+## 免责声明
 
-This project is provided as-is. Use it at your own risk. Ensure you understand how it works and configure it correctly for your specific needs. The author is not responsible for any issues or damages caused by using this project.
+本项目按现状提供。使用风险自负。请确保您理解其工作原理，并根据您的具体需求正确配置。作者不对因使用本项目而产生的任何问题或损害负责。
 
-## Contributing
+## 贡献
 
-Contributions are welcome! Feel free to open issues or submit pull requests.
+欢迎贡献！请随时提出issue或提交pull request。
